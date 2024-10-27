@@ -11,15 +11,14 @@ import android.net.Uri
 import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.DisplayMetrics
+import android.text.SpannableStringBuilder
 import android.util.Log
-import android.view.Display
 import android.widget.Toast
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.text.HtmlCompat
 import com.example.myapplication.databinding.ActivityMainBinding
 import com.permissionx.guolindev.PermissionX
-import org.tensorflow.lite.task.vision.classifier.Classifications
 
 class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListener {
 
@@ -37,7 +36,7 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
         setContentView(activityMainBinding.root)
 
         imageClassifierHelper =
-            ImageClassifierHelper(context = this, imageClassifierListener = this)
+            ImageClassifierHelper(context = this, this)
 
 
         activityMainBinding.selectImage.setOnClickListener {
@@ -61,12 +60,15 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
         }
     }
 
-    override fun onError(error: String) {
-        Log.v("==TAG==", "MainActivity.onError: $error")
-    }
+    override fun onResults(results: List<Pair<String, Float>>?, inferenceTime: Long) {
 
-    override fun onResults(results: List<Classifications>?, inferenceTime: Long) {
-        Log.v("==TAG==", "MainActivity.onResults: $results, $inferenceTime")
+        activityMainBinding.inferenceTime.text = "Inference: ${inferenceTime}ms"
+        activityMainBinding.classification.text = "Classification: \n\n"+
+            SpannableStringBuilder().also { sb ->
+                results?.forEach {
+                    sb.append("\u2022 "+it.first + "\n")
+                }
+            }
     }
 
     private val pickMedia = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -77,7 +79,9 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
                 val modifiedBitmap = ThumbnailUtils.extractThumbnail(bitmap, imageWidth, imageHeight, ThumbnailUtils.OPTIONS_RECYCLE_INPUT)
                 activityMainBinding.image.setImageBitmap(modifiedBitmap)
 
-                normalizeAndClassify(modifiedBitmap)
+//                normalizeAndClassify(modifiedBitmap)
+                val input = processBitmap(modifiedBitmap, imageWidth, imageHeight)
+                imageClassifierHelper.classify(input)
             }
 
         } else {
@@ -85,7 +89,25 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
         }
     }
 
-    private fun normalizeAndClassify(bitmap: Bitmap) {
+    private fun processBitmap(bitmap: Bitmap, imageWidth: Int, imageHeight: Int): Array<Array<Array<FloatArray>>> {
+        val input = Array(1) { Array(imageWidth) { Array(imageHeight) { FloatArray(3) } } }
+
+        val mean = arrayOf(0.485F, 0.456F, 0.406F)
+        val std = arrayOf(0.229F, 0.224F, 0.225F)
+
+
+        for (x in 0 until imageWidth) {
+            for (y in 0 until imageHeight) {
+                val pixel = bitmap.getPixel(x, y)
+                input[0][x][y][0] = ((pixel shr 16 and 0xFF) / 255.0f) - mean[0] / std[0] // Red channel
+                input[0][x][y][1] = ((pixel shr 8 and 0xFF) / 255.0f) - mean[1] / std[1]  // Green channel
+                input[0][x][y][2] = ((pixel and 0xFF) / 255.0f) - mean[2] / std[2]         // Blue channel
+            }
+        }
+        return input
+    }
+
+   /* private fun normalizeAndClassify(bitmap: Bitmap) {
 
         val floatBuffer = FloatArray(imageWidth * imageHeight * channelCount)
         val mean = arrayOf(0.485F, 0.456F, 0.406F)
@@ -118,9 +140,8 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
             }
         }
 
-
-        imageClassifierHelper.classify(floatBuffer, getScreenOrientation())
-    }
+        imageClassifierHelper.classify(floatBuffer)
+    }*/
 
 
     private fun uriToBitmap(context: Context, uri: Uri): Bitmap? {
@@ -141,20 +162,5 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
         }
     }
 
-    private fun getScreenOrientation(): Int {
-        val outMetrics = DisplayMetrics()
 
-        val display: Display?
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            display = getDisplay()
-            windowManager.currentWindowMetrics
-        } else {
-            @Suppress("DEPRECATION")
-            display = windowManager.defaultDisplay
-            @Suppress("DEPRECATION")
-            display.getMetrics(outMetrics)
-        }
-
-        return display?.rotation ?: 0
-    }
 }

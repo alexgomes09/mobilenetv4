@@ -35,31 +35,21 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_marginTop="30dp"
+        android:singleLine="false"
+        android:text="Classification: --"
         android:textColor="@android:color/black"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/image"
-        tools:text="Classification: Loafer" />
+        app:layout_constraintTop_toBottomOf="@id/image" />
 
-
-    <TextView
-        android:id="@+id/totalClassificationTime"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="40dp"
-        android:textColor="@android:color/black"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@id/classification"
-        tools:text="Total Classification Time: 0.0000 sec" />
 
     <TextView
         android:id="@+id/inferenceTime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/totalClassificationTime"
+        app:layout_constraintTop_toBottomOf="@id/classification"
         android:layout_marginTop="10dp"
-        tools:text="Inference Time: 0.0000 sec"
+        android:text="Inference Time: --"
         app:layout_constraintEnd_toEndOf="parent"
         android:textColor="@android:color/black"
         app:layout_constraintStart_toStartOf="parent"/>
@@ -71,16 +61,7 @@
         android:text="Select Image"
         android:layout_marginTop="40dp"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/classifyImage"
-        app:layout_constraintTop_toBottomOf="@id/inferenceTime"/>
-
-    <Button
-        android:id="@+id/classifyImage"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Classify Image"
         app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toEndOf="@id/selectImage"
-        app:layout_constraintTop_toTopOf="@id/selectImage"/>
+        app:layout_constraintTop_toBottomOf="@id/inferenceTime"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
