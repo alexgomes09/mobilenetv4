@@ -42,12 +42,22 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toBottomOf="@id/image" />
 
+    <TextView
+        android:id="@+id/resize_normalization_time"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@id/classification"
+        android:layout_marginTop="10dp"
+        android:text="Resize &amp; Noralization Time: --"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:textColor="@android:color/black"
+        app:layout_constraintStart_toStartOf="parent"/>
 
     <TextView
         android:id="@+id/inferenceTime"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@id/classification"
+        app:layout_constraintTop_toBottomOf="@id/resize_normalization_time"
         android:layout_marginTop="10dp"
         android:text="Inference Time: --"
         app:layout_constraintEnd_toEndOf="parent"

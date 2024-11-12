@@ -80,8 +80,6 @@ class ImageClassifierHelper(
             interpreter?.run(input, output)
         }
 
-        Log.v("==TAG==", "ImageClassifierHelper.classify: ${time}ms")
-
         val topResult = getTopResult(output[0])
 
         classifierListener?.onResults(topResult, time)

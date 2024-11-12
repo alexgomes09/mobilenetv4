@@ -19,15 +19,16 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.text.HtmlCompat
 import com.example.myapplication.databinding.ActivityMainBinding
 import com.permissionx.guolindev.PermissionX
+import kotlin.system.measureTimeMillis
 
 class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListener {
 
     private lateinit var activityMainBinding: ActivityMainBinding
     private lateinit var imageClassifierHelper: ImageClassifierHelper
-    private val imageWidth = 244
-    private val imageHeight = 244
+    private val imageWidth = 244 * 2
+    private val imageHeight = 244 * 2
     private val channelCount = 3
-    private val bytesPerPixel = 4
+    private var resizeAndNormalizationTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,7 +38,6 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
 
         imageClassifierHelper =
             ImageClassifierHelper(context = this, this)
-
 
         activityMainBinding.selectImage.setOnClickListener {
             PermissionX.init(this)
@@ -63,23 +63,30 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
     override fun onResults(results: List<Pair<String, Float>>?, inferenceTime: Long) {
 
         activityMainBinding.inferenceTime.text = "Inference: ${inferenceTime}ms"
-        activityMainBinding.classification.text = "Classification: \n\n"+
-            SpannableStringBuilder().also { sb ->
-                results?.forEach {
-                    sb.append("\u2022 "+it.first + "\n")
+        activityMainBinding.resizeNormalizationTime.text = "Resize & Normalization: ${resizeAndNormalizationTime}ms"
+        activityMainBinding.classification.text = "Classification: \n\n" +
+                SpannableStringBuilder().also { sb ->
+                    results?.forEach {
+                        sb.append("\u2022 " + it.first + "\n")
+                    }
                 }
-            }
     }
 
     private val pickMedia = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
 
-            uriToBitmap(this, uri)?.let { bitmap ->
+            resizeAndNormalizationTime = 0L
 
-                val modifiedBitmap = ThumbnailUtils.extractThumbnail(bitmap, imageWidth, imageHeight, ThumbnailUtils.OPTIONS_RECYCLE_INPUT)
-                activityMainBinding.image.setImageBitmap(modifiedBitmap)
+            uriToBitmap(this, uri)?.let { bitmap ->
+                var modifiedBitmap = bitmap
+
+                resizeAndNormalizationTime += measureTimeMillis {
+                    modifiedBitmap = ThumbnailUtils.extractThumbnail(bitmap, imageWidth, imageHeight, ThumbnailUtils.OPTIONS_RECYCLE_INPUT)
+                    activityMainBinding.image.setImageBitmap(modifiedBitmap)
 
 //                normalizeAndClassify(modifiedBitmap)
+                }
+
                 val input = processBitmap(modifiedBitmap, imageWidth, imageHeight)
                 imageClassifierHelper.classify(input)
             }
@@ -92,56 +99,59 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
     private fun processBitmap(bitmap: Bitmap, imageWidth: Int, imageHeight: Int): Array<Array<Array<FloatArray>>> {
         val input = Array(1) { Array(imageWidth) { Array(imageHeight) { FloatArray(3) } } }
 
-        val mean = arrayOf(0.485F, 0.456F, 0.406F)
-        val std = arrayOf(0.229F, 0.224F, 0.225F)
+        resizeAndNormalizationTime += measureTimeMillis {
+
+            val mean = arrayOf(0.485F, 0.456F, 0.406F)
+            val std = arrayOf(0.229F, 0.224F, 0.225F)
 
 
-        for (x in 0 until imageWidth) {
-            for (y in 0 until imageHeight) {
-                val pixel = bitmap.getPixel(x, y)
-                input[0][x][y][0] = ((pixel shr 16 and 0xFF) / 255.0f) - mean[0] / std[0] // Red channel
-                input[0][x][y][1] = ((pixel shr 8 and 0xFF) / 255.0f) - mean[1] / std[1]  // Green channel
-                input[0][x][y][2] = ((pixel and 0xFF) / 255.0f) - mean[2] / std[2]         // Blue channel
+            for (x in 0 until imageWidth) {
+                for (y in 0 until imageHeight) {
+                    val pixel = bitmap.getPixel(x, y)
+                    input[0][x][y][0] = ((pixel shr 16 and 0xFF) / 255.0f) - mean[0] / std[0] // Red channel
+                    input[0][x][y][1] = ((pixel shr 8 and 0xFF) / 255.0f) - mean[1] / std[1]  // Green channel
+                    input[0][x][y][2] = ((pixel and 0xFF) / 255.0f) - mean[2] / std[2]         // Blue channel
+                }
             }
         }
         return input
     }
 
-   /* private fun normalizeAndClassify(bitmap: Bitmap) {
+    /* private fun normalizeAndClassify(bitmap: Bitmap) {
 
-        val floatBuffer = FloatArray(imageWidth * imageHeight * channelCount)
-        val mean = arrayOf(0.485F, 0.456F, 0.406F)
-        val std = arrayOf(0.229F, 0.224F, 0.225F)
+         val floatBuffer = FloatArray(imageWidth * imageHeight * channelCount)
+         val mean = arrayOf(0.485F, 0.456F, 0.406F)
+         val std = arrayOf(0.229F, 0.224F, 0.225F)
 
-        for (y in 0 until 2) {
-            for (x in 0 until imageWidth) {
+         for (y in 0 until 2) {
+             for (x in 0 until imageWidth) {
 
-                /// Normalize the values so that they fall between 0 and 1.
-                var red: Float
-                var green: Float
-                var blue: Float
-
-
-                bitmap.getPixel(x, y).also {
-                    red = Color.red(it) / 255F
-                    green = Color.green(it) / 255f
-                    blue = Color.blue(it) / 255f
-                    val alpha = Color.alpha(it)
-                }
+                 /// Normalize the values so that they fall between 0 and 1.
+                 var red: Float
+                 var green: Float
+                 var blue: Float
 
 
-                /// floatBuffer contains only the RGB values. floatBuffer has been linearized/flattened i.e. it's being treated as one single row.
-                /// Center (around zero) and scale the data according to the mean and standard deviation.
-                val baseIndex = (y * imageWidth * channelCount) + (x * channelCount)
+                 bitmap.getPixel(x, y).also {
+                     red = Color.red(it) / 255F
+                     green = Color.green(it) / 255f
+                     blue = Color.blue(it) / 255f
+                     val alpha = Color.alpha(it)
+                 }
 
-                floatBuffer[baseIndex + 0] = (red - mean[0]) / std[0]
-                floatBuffer[baseIndex + 1] = (green - mean[1]) / std[1]
-                floatBuffer[baseIndex + 2] = (blue - mean[2]) / std[2]
-            }
-        }
 
-        imageClassifierHelper.classify(floatBuffer)
-    }*/
+                 /// floatBuffer contains only the RGB values. floatBuffer has been linearized/flattened i.e. it's being treated as one single row.
+                 /// Center (around zero) and scale the data according to the mean and standard deviation.
+                 val baseIndex = (y * imageWidth * channelCount) + (x * channelCount)
+
+                 floatBuffer[baseIndex + 0] = (red - mean[0]) / std[0]
+                 floatBuffer[baseIndex + 1] = (green - mean[1]) / std[1]
+                 floatBuffer[baseIndex + 2] = (blue - mean[2]) / std[2]
+             }
+         }
+
+         imageClassifierHelper.classify(floatBuffer)
+     }*/
 
 
     private fun uriToBitmap(context: Context, uri: Uri): Bitmap? {
