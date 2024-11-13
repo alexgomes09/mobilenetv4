@@ -17,10 +17,16 @@
 package com.example.myapplication
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.util.Log
 import org.json.JSONObject
+import org.tensorflow.lite.DataType
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.InterpreterApi
+import org.tensorflow.lite.support.common.ops.NormalizeOp
+import org.tensorflow.lite.support.image.ImageProcessor
+import org.tensorflow.lite.support.image.TensorImage
+import org.tensorflow.lite.support.image.ops.ResizeOp
 import java.io.FileInputStream
 import java.io.IOException
 import java.nio.MappedByteBuffer
@@ -72,20 +78,33 @@ class ImageClassifierHelper(
         return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength)
     }
 
-    fun classify(input: Array<Array<Array<FloatArray>>>) {
+    // Function to preprocess the bitmap for the model
+    fun preprocessImage(bitmap: Bitmap): TensorImage {
 
+        val imageProcessor = ImageProcessor.Builder()
+            .add(ResizeOp(224, 224, ResizeOp.ResizeMethod.BILINEAR))
+            .add(NormalizeOp(0f, 1f)) // Normalize to [0,1] range if required by your model
+            .build()
+
+        val tensorImage = imageProcessor.process(TensorImage.fromBitmap(bitmap))
+
+        return tensorImage
+    }
+
+    fun classify(tensorImage: TensorImage){
         val output = Array(1) { FloatArray(numClasses) }
 
         val time = measureTimeMillis {
-            interpreter?.run(input, output)
+//            interpreter?.run(tensorImage.buffer, output)
         }
 
         val topResult = getTopResult(output[0])
 
         classifierListener?.onResults(topResult, time)
+
     }
 
-    fun getTopResult(output: FloatArray, topK: Int = 3): List<Pair<String, Float>> {
+    private fun getTopResult(output: FloatArray, topK: Int = 3): List<Pair<String, Float>> {
         return output.mapIndexed { index, score -> index to score}
             .sortedByDescending { it.second }
             .take(topK)

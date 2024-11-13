@@ -78,43 +78,18 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
             resizeAndNormalizationTime = 0L
 
             uriToBitmap(this, uri)?.let { bitmap ->
-                var modifiedBitmap = bitmap
 
-                resizeAndNormalizationTime += measureTimeMillis {
-                    modifiedBitmap = ThumbnailUtils.extractThumbnail(bitmap, imageWidth, imageHeight, ThumbnailUtils.OPTIONS_RECYCLE_INPUT)
-                    activityMainBinding.image.setImageBitmap(modifiedBitmap)
 
-//                normalizeAndClassify(modifiedBitmap)
-                }
+                val tensorImage = imageClassifierHelper.preprocessImage(bitmap)
 
-                val input = processBitmap(modifiedBitmap, imageWidth, imageHeight)
-                imageClassifierHelper.classify(input)
+                activityMainBinding.image.setImageBitmap(tensorImage.bitmap)
+
+                imageClassifierHelper.classify(tensorImage)
             }
 
         } else {
             Log.d("PhotoPicker", "No media selected")
         }
-    }
-
-    private fun processBitmap(bitmap: Bitmap, imageWidth: Int, imageHeight: Int): Array<Array<Array<FloatArray>>> {
-        val input = Array(1) { Array(imageWidth) { Array(imageHeight) { FloatArray(3) } } }
-
-        resizeAndNormalizationTime += measureTimeMillis {
-
-            val mean = arrayOf(0.485F, 0.456F, 0.406F)
-            val std = arrayOf(0.229F, 0.224F, 0.225F)
-
-
-            for (x in 0 until imageWidth) {
-                for (y in 0 until imageHeight) {
-                    val pixel = bitmap.getPixel(x, y)
-                    input[0][x][y][0] = ((pixel shr 16 and 0xFF) / 255.0f) - mean[0] / std[0] // Red channel
-                    input[0][x][y][1] = ((pixel shr 8 and 0xFF) / 255.0f) - mean[1] / std[1]  // Green channel
-                    input[0][x][y][2] = ((pixel and 0xFF) / 255.0f) - mean[2] / std[2]         // Blue channel
-                }
-            }
-        }
-        return input
     }
 
     /* private fun normalizeAndClassify(bitmap: Bitmap) {
@@ -162,13 +137,13 @@ class MainActivity : AppCompatActivity(), ImageClassifierHelper.ClassifierListen
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             // For Android P (API level 28) and higher, use ImageDecoder to decode the Bitmap
             val source = ImageDecoder.createSource(contentResolver, uri)
-            ImageDecoder.decodeBitmap(source).copy(Bitmap.Config.RGB_565, true)
+            ImageDecoder.decodeBitmap(source).copy(Bitmap.Config.ARGB_8888, true)
         } else {
             // For versions prior to Android P, use BitmapFactory to decode the Bitmap
             val bitmap = context.contentResolver.openInputStream(uri)?.use { stream ->
                 Bitmap.createBitmap(BitmapFactory.decodeStream(stream))
             }
-            bitmap?.copy(Bitmap.Config.RGB_565, true)
+            bitmap?.copy(Bitmap.Config.ARGB_8888, true)
         }
     }
 
